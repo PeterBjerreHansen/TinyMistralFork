@@ -194,6 +194,20 @@ If it fails, run the layer-by-layer diagnostic:
 uv run python scripts/compare_hf_layers.py --device cpu --dtype float32
 ```
 
+The real-checkpoint rolling-cache parity gate compares 96 token-by-token logits with full
+recomputation and exercises multiple sliding-window evictions:
+
+```bash
+uv run python scripts/compare_cache.py --device cpu --dtype float32 --length 96
+```
+
+The 64-token greedy-generation oracle also compares the rolling-cache output directly with
+Transformers 4.45.2:
+
+```bash
+uv run python scripts/compare_hf_generation.py --max-new-tokens 64
+```
+
 The Hugging Face oracle uses eager attention intentionally. These are correctness checks, not performance runs.
 
 ## 5. Check the optimized backend with real weights
@@ -234,6 +248,9 @@ uv run python scripts/generate.py \
 ```
 
 Because `auto` is used, prompt prefill uses the `local` O(TW) backend on MPS and subsequent token-by-token generation uses the rolling local KV cache.
+
+The minimal `generate()` API intentionally supports one prompt at a time (batch size 1). Generate
+batched prompts independently when they need separate EOS stopping behavior.
 
 For deterministic greedy generation, leave `--temperature 0`. For sampling:
 

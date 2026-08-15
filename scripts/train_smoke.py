@@ -45,10 +45,12 @@ def main() -> None:
         raise RuntimeError("non-finite gradient detected")
     optimizer.step()
     after = model(ids, labels=ids, use_cache=False).loss
+    if after is None or not bool(torch.isfinite(after).item()):
+        raise RuntimeError("non-finite loss after optimizer step")
     print(f"device={device} dtype={next(model.parameters()).dtype} backend={args.backend}")
     print(f"loss_before={before.item():.6f}")
     print(f"loss_after ={after.item():.6f}")
-    print("PASS: forward/backward/optimizer step completed with finite gradients")
+    print("PASS: forward/backward/optimizer step completed with finite loss and gradients")
 
 
 if __name__ == "__main__":

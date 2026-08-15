@@ -420,19 +420,32 @@ class MistralModel(nn.Module):
         if past_key_values is not None and len(past_key_values) != len(self.layers):
             raise ValueError("past_key_values must have one cache per layer")
 
+        cache_start: int | None = None
+        if past_key_values:
+            next_positions = {cache.next_position for cache in past_key_values}
+            if len(next_positions) != 1:
+                raise ValueError("layer caches disagree on next absolute position")
+            cache_start = next(iter(next_positions))
+
         if position_ids is None:
-            start = 0
-            if past_key_values:
-                next_positions = {cache.next_position for cache in past_key_values}
-                if len(next_positions) != 1:
-                    raise ValueError("layer caches disagree on next absolute position")
-                start = next(iter(next_positions))
+            start = 0 if cache_start is None else cache_start
             position_ids = torch.arange(
                 start, start + seq_len, device=inputs_embeds.device, dtype=torch.long
             )[None, :].expand(bsz, -1)
         else:
             if position_ids.shape != (bsz, seq_len):
                 raise ValueError("position_ids must have shape [B, T]")
+            if cache_start is not None:
+                expected = torch.arange(
+                    cache_start,
+                    cache_start + seq_len,
+                    device=position_ids.device,
+                    dtype=position_ids.dtype,
+                )[None, :].expand(bsz, -1)
+                if not torch.equal(position_ids, expected):
+                    raise ValueError(
+                        "cached decoding requires contiguous absolute position_ids"
+                    )
 
         hidden_states = inputs_embeds
         all_hidden_states: list[torch.Tensor] | None = [] if output_hidden_states else None
@@ -560,8 +573,15 @@ class MistralForCausalLM(nn.Module):
         top_k: int | None = None,
         eos_token_id: int | None = None,
     ) -> torch.Tensor:
+        """Generate one prompt with the rolling KV cache.
+
+        This minimal baseline intentionally supports batch size one. Callers
+        needing independent EOS handling should generate each prompt separately.
+        """
         if input_ids.ndim != 2 or input_ids.shape[1] == 0:
             raise ValueError("input_ids must be non-empty [B, T]")
+        if input_ids.shape[0] != 1:
+            raise ValueError("generate currently supports batch size 1")
         if max_new_tokens < 0:
             raise ValueError("max_new_tokens must be non-negative")
         if max_new_tokens == 0:

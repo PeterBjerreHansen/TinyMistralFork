@@ -1,3 +1,4 @@
+import pytest
 import torch
 
 from conftest import micro_config
@@ -11,3 +12,10 @@ def test_greedy_generate_shape_and_prefix_preserved():
     out = model.generate(prefix, 5, temperature=0.0)
     assert out.shape == (1, 9)
     assert torch.equal(out[:, :4], prefix)
+
+
+def test_generate_requires_batch_size_one():
+    cfg = micro_config(eos_token_id=9999)
+    model = MistralForCausalLM(cfg, attention_backend="reference").eval()
+    with pytest.raises(ValueError, match="batch size 1"):
+        model.generate(torch.tensor([[1, 2], [3, 4]]), 1)

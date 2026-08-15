@@ -1,3 +1,4 @@
+import pytest
 import torch
 
 from conftest import micro_config
@@ -21,3 +22,18 @@ def test_incremental_cache_matches_full_forward_at_each_position():
                 assert layer_cache.seq_len <= max(cfg.sliding_window - 1, 0)
         inc = torch.cat(pieces, dim=1)
     torch.testing.assert_close(inc, full, atol=3e-5, rtol=3e-5)
+
+
+def test_cached_decoding_rejects_noncontiguous_position_ids():
+    cfg = micro_config(num_hidden_layers=2, sliding_window=4)
+    model = MistralForCausalLM(cfg, attention_backend="reference").eval()
+    ids = torch.randint(0, cfg.vocab_size, (1, 3))
+    with torch.no_grad():
+        first = model(ids[:, :1], use_cache=True)
+        with pytest.raises(ValueError, match="contiguous"):
+            model(
+                ids[:, 1:3],
+                past_key_values=first.past_key_values,
+                position_ids=torch.tensor([[1, 3]]),
+                use_cache=True,
+            )

@@ -55,8 +55,8 @@ class MistralConfig:
             raise ValueError(
                 "this reference expects num_attention_heads * head_dim == hidden_size"
             )
-        if self.sliding_window is not None and self.sliding_window < 0:
-            raise ValueError("sliding_window must be non-negative or None")
+        if self.sliding_window is not None and self.sliding_window <= 0:
+            raise ValueError("sliding_window must be positive or None")
         if not 0.0 <= self.attention_dropout < 1.0:
             raise ValueError("attention_dropout must be in [0, 1)")
         if self.hidden_act != "silu":

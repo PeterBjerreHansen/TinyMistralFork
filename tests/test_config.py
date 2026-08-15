@@ -1,3 +1,5 @@
+import pytest
+
 from tiny_mistral.config import MistralConfig, tiny_mistral_248m_config
 
 
@@ -26,3 +28,9 @@ def test_checked_in_checkpoint_config_snapshot_matches_factory():
     from pathlib import Path
     path = Path(__file__).parents[1] / "configs" / "TinyMistral-248M-v3.config.json"
     assert MistralConfig.from_json_file(path) == tiny_mistral_248m_config()
+
+
+@pytest.mark.parametrize("window", [0, -1])
+def test_config_rejects_non_positive_sliding_window(window):
+    with pytest.raises(ValueError, match="positive"):
+        MistralConfig(sliding_window=window)
