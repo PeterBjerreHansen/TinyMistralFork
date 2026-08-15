@@ -1,0 +1,21 @@
+#!/usr/bin/env python
+from __future__ import annotations
+
+import argparse
+import json
+
+from tiny_mistral.loading import verify_checkpoint_structure
+
+
+def main() -> None:
+    p = argparse.ArgumentParser()
+    p.add_argument("model_dir", nargs="?", default="checkpoints/TinyMistral-248M-v3")
+    args = p.parse_args()
+    result = verify_checkpoint_structure(args.model_dir)
+    print(json.dumps(result, indent=2, default=list))
+    if not result["ok"]:
+        raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    main()

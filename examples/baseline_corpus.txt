@@ -1,0 +1,11 @@
+A small language model can be tested by continued training on a compact local corpus. This file is intentionally simple and is included only so the training script has an offline example after the pretrained checkpoint and tokenizer have been downloaded.
+
+The purpose of the baseline repository is reproducibility. A model implementation should first reproduce the original network before experimental recurrence, memory, or additional attention mechanisms are introduced. Each change should have a clear control and a test that can fail when semantics drift.
+
+Sliding-window attention restricts each layer to nearby tokens. Information can still move farther through repeated layers, but direct access is local. A useful implementation therefore distinguishes the mathematical attention pattern from the efficiency of the kernel that realizes it.
+
+On Apple hardware, the Metal Performance Shaders backend can execute PyTorch operations on the integrated GPU. The local attention backend in this repository constructs only the causal window needed by each query and avoids a dense sequence-by-sequence score matrix.
+
+Tests are part of the model. They check tensor shapes, rotary embeddings, grouped-query attention, sliding-window boundaries, cached decoding, gradients, and agreement between optimized and reference paths. Passing tests does not prove a research hypothesis, but it makes later experiments easier to interpret.
+
+A baseline training run should remain deliberately boring. It should use ordinary next-token prediction with the pretrained architecture unchanged. If a later multipass model improves on that baseline, the difference should come from the experimental mechanism rather than from hidden changes to tokenization, masking, optimization, or checkpoint loading.
