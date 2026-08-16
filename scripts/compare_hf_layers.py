@@ -37,8 +37,8 @@ def main() -> None:
     ).to(device).eval()
     with torch.no_grad():
         hf_out = hf(input_ids=ids, use_cache=False, output_hidden_states=True)
-        hf_hidden = tuple(x[:, :, :64].float().cpu() for x in hf_out.hidden_states)
-        hf_logits = hf_out.logits[:, :, :128].float().cpu()
+        hf_hidden = tuple(x.float().cpu() for x in hf_out.hidden_states)
+        hf_logits = hf_out.logits.float().cpu()
     del hf, hf_out
     gc.collect()
     if device.type == "cuda":
@@ -53,8 +53,8 @@ def main() -> None:
     ).eval()
     with torch.no_grad():
         our_out = ours(ids, use_cache=False, output_hidden_states=True)
-        our_hidden = tuple(x[:, :, :64].float().cpu() for x in our_out.hidden_states)
-        our_logits = our_out.logits[:, :, :128].float().cpu()
+        our_hidden = tuple(x.float().cpu() for x in our_out.hidden_states)
+        our_logits = our_out.logits.float().cpu()
 
     atol, rtol = ((2e-5, 2e-5) if dtype == torch.float32 else (8e-3, 8e-3))
     if len(hf_hidden) != len(our_hidden):

@@ -172,7 +172,7 @@ checkpoints/TinyMistral-248M-v3/
 uv run python scripts/verify_checkpoint.py
 ```
 
-This checks tensor names, tensor shapes, strict architecture compatibility, and the expected parameter count before the full model is moved to an accelerator.
+This checks tensor names, tensor shapes, the complete recognized config against the pinned TinyMistral-248M-v3 config, the exact 248,024,064 parameter count, and the pinned safetensors SHA-256 before the full model is moved to an accelerator. The library also retains a generic structural verifier for internally consistent non-target checkpoints used by tests.
 
 Optional tensor inspection:
 
@@ -182,27 +182,25 @@ uv run python scripts/inspect_checkpoint.py
 
 ## 4. Compare against Transformers 4.45.2
 
-The strongest architecture-level acceptance test is still the CPU FP32 reference comparison:
+Start with the short CPU FP32 logits smoke test:
 
 ```bash
 uv run python scripts/compare_hf.py --device cpu --dtype float32
 ```
 
-If it fails, run the layer-by-layer diagnostic:
+The mandatory architecture oracle compares every hidden channel and every vocabulary logit over 40 positions, deliberately crossing the 32-token sliding window:
 
 ```bash
 uv run python scripts/compare_hf_layers.py --device cpu --dtype float32
 ```
 
-The real-checkpoint rolling-cache parity gate compares 96 token-by-token logits with full
-recomputation and exercises multiple sliding-window evictions:
+The mandatory real-checkpoint rolling-cache parity gate compares 96 token-by-token logits with full recomputation and exercises multiple sliding-window evictions:
 
 ```bash
 uv run python scripts/compare_cache.py --device cpu --dtype float32 --length 96
 ```
 
-The 64-token greedy-generation oracle also compares the rolling-cache output directly with
-Transformers 4.45.2:
+The mandatory 64-token greedy-generation oracle compares the rolling-cache output directly with Transformers 4.45.2 and asserts that all 64 tokens were produced, ensuring repeated window eviction:
 
 ```bash
 uv run python scripts/compare_hf_generation.py --max-new-tokens 64
@@ -291,7 +289,7 @@ This uses random token IDs and proves that the **real 248M checkpoint** supports
 ```bash
 uv run python scripts/train_smoke.py \
   --device mps \
-  --dtype float16 \
+  --dtype float32 \
   --backend auto \
   --seq-len 64
 ```
@@ -306,7 +304,7 @@ uv run python scripts/train_smoke.py \
   --seq-len 64
 ```
 
-If MPS unified memory is tight, lower `--seq-len` to 32.
+The validated MPS training baseline uses FP32. Direct FP16 AdamW updates on the tested Mac/PyTorch stack produced a non-finite post-update loss, so FP16 is retained for inference and attention validation but is not claimed as a stable training mode. If MPS unified memory is tight, lower `--seq-len` to 32.
 
 ## Small ordinary continued-pretraining baseline
 
@@ -317,7 +315,7 @@ On MPS:
 ```bash
 uv run python scripts/train_baseline.py \
   --device mps \
-  --dtype float16 \
+  --dtype float32 \
   --backend auto \
   --steps 10 \
   --seq-len 128 \
@@ -333,7 +331,7 @@ To use your own local text:
 uv run python scripts/train_baseline.py \
   --text-file /path/to/corpus.txt \
   --device mps \
-  --dtype float16 \
+  --dtype float32 \
   --steps 100 \
   --seq-len 256
 ```
@@ -398,25 +396,26 @@ The loader constructs the model on the `meta` device, performs a strict `assign=
 
 # Acceptance gate before MPTT work
 
-Do not add experimental model architecture code until the intended experiment machine passes:
+Do not add experimental model architecture code until the intended Mac passes every applicable command below:
 
-```text
-unit tests (`uv run pytest -q`)
-checkpoint verification
-Hugging Face comparison (CPU FP32)
-backend comparison on the intended accelerator
-training smoke test on the intended accelerator
-generation on the intended accelerator
-attention benchmark sanity check
+```bash
+uv sync --locked
+uv run pytest -q
+uv run python scripts/mps_smoke.py
+uv run python scripts/verify_checkpoint.py
+uv run python scripts/compare_hf_layers.py --device cpu --dtype float32
+uv run python scripts/compare_cache.py --device cpu --dtype float32 --length 96
+uv run python scripts/compare_hf_generation.py --max-new-tokens 64
+uv run python scripts/compare_backends.py --device mps --dtype float16 --optimized-backend local
+uv run python scripts/train_smoke.py --device mps --dtype float32 --backend auto --seq-len 64
+uv run python scripts/generate.py "The meaning of life is" --device mps --dtype float16 --backend auto --max-new-tokens 40
+uv run python scripts/train_baseline.py --device mps --dtype float32 --backend auto --steps 10 --seq-len 128 --batch-size 1 --lr 1e-6
+uv run python scripts/benchmark_attention.py --device mps --dtype float16 --lengths 128 256 512 1024 2048
 ```
 
-For a Mac, also require:
+The short `compare_hf.py` command remains useful as a quick smoke test, but the full layer oracle above is the required gate. CUDA users should substitute the CUDA/BF16/Flex checks documented earlier.
 
-```text
-MPS smoke test (`uv run python scripts/mps_smoke.py`)
-```
-
-Once green, tag the repository—for example `v0.2.0-vanilla-mps`—and branch future FBT/MemoryTape/MPTT work from that immutable reference point.
+Once green, record the exact environment and results in `TEST_REPORT.md`, tag the repository—for example `v0.2.0-vanilla-mps`—and branch future FBT/MemoryTape/MPTT work from that immutable reference point. A research branch must retain a mode that reproduces this vanilla baseline.
 
 ## Non-goals
 

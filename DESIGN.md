@@ -26,7 +26,7 @@ It deliberately does not support arbitrary padding or nonzero/noncontiguous posi
 
 `auto` selects `local` for compatible MPS full-sequence forwards. No FlexAttention call is attempted on MPS. The hardware test under `scripts/mps_smoke.py` verifies forward agreement and backward on an actual MPS runtime.
 
-The default MPS dtype is FP16. Users may explicitly request BF16 if their macOS/PyTorch/hardware combination supports it.
+FP16 is the default MPS dtype for inference and attention checks. On the validated Mac/PyTorch stack, direct FP16 AdamW updates can produce non-finite weights even when the forward loss and gradients are finite. The vanilla training acceptance baseline therefore uses FP32 on MPS. Mixed-precision training requires an explicit stability design rather than relying on raw FP16 optimizer state.
 
 ## Cached decode
 

@@ -435,16 +435,23 @@ class MistralModel(nn.Module):
         else:
             if position_ids.shape != (bsz, seq_len):
                 raise ValueError("position_ids must have shape [B, T]")
-            if cache_start is not None:
-                expected = torch.arange(
-                    cache_start,
-                    cache_start + seq_len,
-                    device=position_ids.device,
-                    dtype=position_ids.dtype,
-                )[None, :].expand(bsz, -1)
+            if use_cache:
+                if cache_start is None:
+                    offsets = torch.arange(
+                        seq_len, device=position_ids.device, dtype=position_ids.dtype
+                    )
+                    expected = position_ids[:1, :1] + offsets[None, :]
+                else:
+                    expected = torch.arange(
+                        cache_start,
+                        cache_start + seq_len,
+                        device=position_ids.device,
+                        dtype=position_ids.dtype,
+                    )[None, :]
+                expected = expected.expand(bsz, -1)
                 if not torch.equal(position_ids, expected):
                     raise ValueError(
-                        "cached decoding requires contiguous absolute position_ids"
+                        "caching requires contiguous absolute position_ids shared across the batch"
                     )
 
         hidden_states = inputs_embeds

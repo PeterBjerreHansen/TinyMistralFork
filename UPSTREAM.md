@@ -9,6 +9,7 @@ This repository is intentionally pinned to a reproducible vanilla reference poin
 - Architecture declared by checkpoint: `MistralForCausalLM`
 - Checkpoint `transformers_version`: `4.45.2`
 - Weight file: `model.safetensors` (not redistributed here)
+- Weight SHA-256: `9432ee6e0681473a9ed513e43362d9911832f9a5c7faded76f46ec66c55a9d3b`
 
 The download helper uses the pinned revision rather than following `main`.
 

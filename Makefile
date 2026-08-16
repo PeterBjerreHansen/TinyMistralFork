@@ -31,10 +31,10 @@ mps-smoke:
 	uv run python scripts/mps_smoke.py
 
 train-smoke:
-	uv run python scripts/train_smoke.py --device auto --dtype auto --backend auto --seq-len 64
+	uv run python scripts/train_smoke.py --device auto --dtype float32 --backend auto --seq-len 64
 
 baseline:
-	uv run python scripts/train_baseline.py --device auto --dtype auto --backend auto --steps 10 --seq-len 128
+	uv run python scripts/train_baseline.py --device auto --dtype float32 --backend auto --steps 10 --seq-len 128
 
 benchmark:
 	uv run python scripts/benchmark_attention.py --device auto --dtype auto

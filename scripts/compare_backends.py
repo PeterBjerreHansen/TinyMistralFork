@@ -46,11 +46,11 @@ def main() -> None:
         ids = ((torch.arange(T, device=device)[None, :] * 101 + 1) % model.config.vocab_size).long()
         with torch.no_grad():
             model.set_attention_backend("reference")
-            ref = model(ids, use_cache=False).logits[:, :, :128].float()
+            ref = model(ids, use_cache=False).logits.float()
             model.set_attention_backend(args.optimized_backend, compile_flex=(device.type == "cuda"))
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", UserWarning)
-                opt = model(ids, use_cache=False).logits[:, :, :128].float()
+                opt = model(ids, use_cache=False).logits.float()
         diff = (ref - opt).abs()
         print(
             f"T={T:4d} backend={args.optimized_backend:5s} "

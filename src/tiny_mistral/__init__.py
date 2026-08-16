@@ -2,11 +2,13 @@ from .config import MistralConfig, tiny_mistral_248m_config
 from .device import mps_available, resolve_device, resolve_dtype, synchronize
 from .loading import (
     EXPECTED_PARAMETER_COUNT,
+    EXPECTED_WEIGHTS_SHA256,
     MODEL_ID,
     MODEL_REVISION,
     download_snapshot,
     load_model,
     verify_checkpoint_structure,
+    verify_target_checkpoint,
 )
 from .modeling import (
     BaseModelOutput,
@@ -30,9 +32,11 @@ __all__ = [
     "MODEL_ID",
     "MODEL_REVISION",
     "EXPECTED_PARAMETER_COUNT",
+    "EXPECTED_WEIGHTS_SHA256",
     "download_snapshot",
     "load_model",
     "verify_checkpoint_structure",
+    "verify_target_checkpoint",
     "BaseModelOutput",
     "CausalLMOutput",
     "LayerKVCache",

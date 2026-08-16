@@ -38,7 +38,7 @@ def main() -> None:
         attn_implementation="eager",
     ).to(device).eval()
     with torch.no_grad():
-        hf_logits = hf(input_ids=ids, use_cache=False).logits[:, :, :128].float().cpu()
+        hf_logits = hf(input_ids=ids, use_cache=False).logits.float().cpu()
     del hf
     gc.collect()
     if device.type == "cuda":
@@ -52,7 +52,7 @@ def main() -> None:
         compile_flex=False,
     ).eval()
     with torch.no_grad():
-        our_logits = ours(ids, use_cache=False).logits[:, :, :128].float().cpu()
+        our_logits = ours(ids, use_cache=False).logits.float().cpu()
 
     diff = (hf_logits - our_logits).abs()
     print(f"max_abs_diff={diff.max().item():.8g}")

@@ -24,7 +24,7 @@ def main() -> None:
     if transformers.__version__ != "4.45.2":
         raise RuntimeError(f"expected transformers==4.45.2, got {transformers.__version__}")
 
-    ids = torch.tensor([[1, 42, 314, 2718, 7, 99, 1234, 2]], dtype=torch.long)
+    ids = torch.tensor([[1, 42, 314, 2718, 7, 99, 1234, 17]], dtype=torch.long)
     mask = torch.ones_like(ids)
     hf = AutoModelForCausalLM.from_pretrained(
         args.model_dir,
@@ -53,8 +53,14 @@ def main() -> None:
     with torch.no_grad():
         ours_ids = ours.generate(ids, args.max_new_tokens, temperature=0.0)
 
+    expected_length = ids.shape[1] + args.max_new_tokens
     print(f"HF shape: {tuple(hf_ids.shape)}")
     print(f"local shape: {tuple(ours_ids.shape)}")
+    if hf_ids.shape != (1, expected_length) or ours_ids.shape != (1, expected_length):
+        raise AssertionError(
+            "generation stopped before all requested tokens were produced: "
+            f"expected length {expected_length}, HF={hf_ids.shape[1]}, local={ours_ids.shape[1]}"
+        )
     torch.testing.assert_close(ours_ids, hf_ids)
     print("PASS: greedy cached generation matches Transformers 4.45.2")
 

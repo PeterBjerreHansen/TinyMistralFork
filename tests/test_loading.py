@@ -4,7 +4,11 @@ import torch
 from safetensors.torch import save_file
 
 from conftest import micro_config
-from tiny_mistral.loading import load_model, verify_checkpoint_structure
+from tiny_mistral.loading import (
+    load_model,
+    verify_checkpoint_structure,
+    verify_target_checkpoint,
+)
 from tiny_mistral.modeling import MistralForCausalLM
 
 
@@ -28,3 +32,15 @@ def test_verify_structure_detects_clean_micro_checkpoint(tmp_path):
     assert result["ok"]
     assert result["missing_keys"] == []
     assert result["unexpected_keys"] == []
+
+
+def test_target_verifier_rejects_other_internally_consistent_model(tmp_path):
+    cfg = micro_config()
+    cfg.to_json_file(tmp_path / "config.json")
+    source = MistralForCausalLM(cfg, attention_backend="reference")
+    save_file(source.state_dict(), tmp_path / "model.safetensors")
+    result = verify_target_checkpoint(tmp_path)
+    assert not result["ok"]
+    assert not result["parameter_count_matches"]
+    assert not result["weights_sha256_matches"]
+    assert result["config_mismatches"]

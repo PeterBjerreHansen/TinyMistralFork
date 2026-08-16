@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -7,13 +8,14 @@ import torch
 from safetensors import safe_open
 from safetensors.torch import load_file
 
-from .config import MistralConfig
+from .config import MistralConfig, tiny_mistral_248m_config
 from .device import resolve_device, resolve_dtype
 from .modeling import AttentionBackend, MistralForCausalLM, MistralRotaryEmbedding
 
 MODEL_ID = "M4-ai/TinyMistral-248M-v3"
 MODEL_REVISION = "5afbc96ddc964c68282cd970ef49e8d1a5e81c52"
 EXPECTED_PARAMETER_COUNT = 248_024_064
+EXPECTED_WEIGHTS_SHA256 = "9432ee6e0681473a9ed513e43362d9911832f9a5c7faded76f46ec66c55a9d3b"
 
 
 def download_snapshot(
@@ -74,7 +76,7 @@ def verify_checkpoint_structure(model_dir: str | Path) -> dict[str, Any]:
         for k in sorted(expected_keys & actual_keys)
         if expected[k] != actual[k][0]
     }
-    parameter_count = sum(math_prod(shape) for shape in expected.values())
+    parameter_count = sum(math_prod(shape) for shape, _dtype in actual.values())
     return {
         "missing_keys": missing,
         "unexpected_keys": unexpected,
@@ -83,6 +85,46 @@ def verify_checkpoint_structure(model_dir: str | Path) -> dict[str, Any]:
         "expected_parameter_count": EXPECTED_PARAMETER_COUNT,
         "ok": not missing and not unexpected and not shape_mismatches,
     }
+
+
+def verify_target_checkpoint(model_dir: str | Path) -> dict[str, Any]:
+    """Verify the exact pinned TinyMistral-248M-v3 acceptance target."""
+    model_dir = Path(model_dir)
+    result = verify_checkpoint_structure(model_dir)
+    actual_config = MistralConfig.from_json_file(model_dir / "config.json")
+    target_config = tiny_mistral_248m_config()
+    config_mismatches = {
+        name: {"expected": expected, "actual": actual}
+        for name, expected in target_config.to_dict().items()
+        if (actual := actual_config.to_dict()[name]) != expected
+    }
+    parameter_count_matches = result["parameter_count"] == EXPECTED_PARAMETER_COUNT
+    weights_sha256 = file_sha256(model_dir / "model.safetensors")
+    weights_sha256_matches = weights_sha256 == EXPECTED_WEIGHTS_SHA256
+    result.update(
+        {
+            "config_mismatches": config_mismatches,
+            "parameter_count_matches": parameter_count_matches,
+            "weights_sha256": weights_sha256,
+            "expected_weights_sha256": EXPECTED_WEIGHTS_SHA256,
+            "weights_sha256_matches": weights_sha256_matches,
+            "ok": (
+                result["ok"]
+                and not config_mismatches
+                and parameter_count_matches
+                and weights_sha256_matches
+            ),
+        }
+    )
+    return result
+
+
+def file_sha256(path: str | Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def math_prod(shape: tuple[int, ...]) -> int:
