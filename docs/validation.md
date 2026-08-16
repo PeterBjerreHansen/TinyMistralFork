@@ -6,8 +6,7 @@ vanilla TinyMistral reference baseline.
 Validated commit:
 `62d2a381b79d9982cc200dc6a01c3b64fea5437b`
 
-Baseline tag:
-`v0.2.0-vanilla-mps`
+This baseline is recorded by commit rather than a repository tag.
 
 ## Environment
 
