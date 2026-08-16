@@ -84,6 +84,7 @@ make test
 make download
 make verify
 make hf-layers
+make hf-embeds-check
 make cache-check
 make hf-generation-check
 make mps-smoke

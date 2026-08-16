@@ -25,6 +25,14 @@ def main() -> None:
     device = resolve_device(args.device)
     dtype = resolve_dtype(args.dtype, device)
     assert dtype is not None
+    if args.optimized_backend == "auto":
+        resolved = {"cuda": "flex", "mps": "local"}.get(device.type, "reference")
+        print(f"resolved optimized backend: {resolved}")
+        if resolved == "reference":
+            raise SystemExit(
+                "optimized-backend auto resolves to reference on CPU; "
+                "choose --optimized-backend local or flex explicitly"
+            )
     model = load_model(
         args.model_dir,
         attention_backend="reference",

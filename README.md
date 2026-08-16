@@ -106,6 +106,7 @@ make download
 make verify
 make hf-check
 make hf-layers
+make hf-embeds-check
 make cache-check
 make hf-generation-check
 make backend-check

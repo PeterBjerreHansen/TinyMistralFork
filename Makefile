@@ -1,4 +1,4 @@
-.PHONY: test compile download verify hf-check hf-layers hf-generation-check backend-check cache-check mps-smoke train-smoke baseline benchmark
+.PHONY: test compile download verify hf-check hf-layers hf-embeds-check hf-generation-check backend-check cache-check mps-smoke train-smoke baseline benchmark
 
 test:
 	uv run pytest -q
@@ -17,6 +17,9 @@ hf-check:
 
 hf-layers:
 	uv run python scripts/compare_hf_layers.py --device cpu --dtype float32
+
+hf-embeds-check:
+	uv run python scripts/compare_hf_inputs_embeds.py --length 40
 
 hf-generation-check:
 	uv run python scripts/compare_hf_generation.py --max-new-tokens 64

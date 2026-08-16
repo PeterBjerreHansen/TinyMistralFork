@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Compare full-model logits with Transformers 4.45.2 eager Mistral.
 
-Run in a Python 3.11 environment with `pip install -e ".[dev]"`. To keep peak
+Run in the project's Python 3.13 environment with `uv sync`. To keep peak
 memory modest, this computes and releases the HF model before loading the local
 implementation.
 """

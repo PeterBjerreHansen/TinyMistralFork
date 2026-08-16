@@ -163,6 +163,7 @@ class MistralAttention(nn.Module):
         past_key_value: LayerKVCache | None,
         attention_mask: torch.Tensor | None,
         position_ids: torch.Tensor,
+        fast_attention_compatible: bool | None = None,
     ) -> Literal["reference", "flex", "local"]:
         backend = self.attention_backend
         if backend == "reference":
@@ -174,19 +175,22 @@ class MistralAttention(nn.Module):
         # common unpadded, zero-based contiguous prefill/training case. Cached
         # decode has at most W visible keys, so the obvious reference path is
         # already O(W) per generated token and is easier to audit.
-        can_fast = (
-            past_key_value is None
-            and hidden_states.shape[1] == position_ids.shape[1]
-            and (
-                attention_mask is None
-                or bool(torch.all(attention_mask.to(torch.bool)).item())
+        if fast_attention_compatible is None:
+            can_fast = (
+                past_key_value is None
+                and hidden_states.shape[1] == position_ids.shape[1]
+                and (
+                    attention_mask is None
+                    or bool(torch.all(attention_mask.to(torch.bool)).item())
+                )
             )
-        )
-        if can_fast:
-            expected = torch.arange(
-                hidden_states.shape[1], device=position_ids.device, dtype=position_ids.dtype
-            )[None, :].expand_as(position_ids)
-            can_fast = bool(torch.equal(position_ids, expected))
+            if can_fast:
+                expected = torch.arange(
+                    hidden_states.shape[1], device=position_ids.device, dtype=position_ids.dtype
+                )[None, :].expand_as(position_ids)
+                can_fast = bool(torch.equal(position_ids, expected))
+        else:
+            can_fast = fast_attention_compatible
 
         # FlexAttention is used only when dropout is zero because this austere
         # wrapper intentionally avoids carrying an explicit score_mod/dropout
@@ -216,6 +220,7 @@ class MistralAttention(nn.Module):
         position_ids: torch.Tensor,
         past_key_value: LayerKVCache | None = None,
         use_cache: bool = False,
+        fast_attention_compatible: bool | None = None,
     ) -> tuple[torch.Tensor, LayerKVCache | None]:
         bsz, q_len, _ = hidden_states.size()
         query_states = self.q_proj(hidden_states)
@@ -261,6 +266,7 @@ class MistralAttention(nn.Module):
             past_key_value=past_key_value,
             attention_mask=attention_mask,
             position_ids=position_ids,
+            fast_attention_compatible=fast_attention_compatible,
         )
         if backend == "flex":
             attn_output = flex_local_attention(
@@ -347,6 +353,7 @@ class MistralDecoderLayer(nn.Module):
         position_ids: torch.Tensor,
         past_key_value: LayerKVCache | None = None,
         use_cache: bool = False,
+        fast_attention_compatible: bool | None = None,
     ) -> tuple[torch.Tensor, LayerKVCache | None]:
         residual = hidden_states
         x = self.input_layernorm(hidden_states)
@@ -415,6 +422,11 @@ class MistralModel(nn.Module):
             raise ValueError("inputs_embeds must have shape [B, T, D]")
 
         bsz, seq_len, _ = inputs_embeds.shape
+        fast_attention_compatible = (
+            past_key_values is None
+            and attention_mask is None
+            and position_ids is None
+        )
         if use_cache is None:
             use_cache = self.config.use_cache
         if past_key_values is not None and len(past_key_values) != len(self.layers):
@@ -468,6 +480,7 @@ class MistralModel(nn.Module):
                 position_ids=position_ids,
                 past_key_value=past,
                 use_cache=bool(use_cache),
+                fast_attention_compatible=fast_attention_compatible,
             )
             if new_caches is not None:
                 assert cache is not None
@@ -591,14 +604,15 @@ class MistralForCausalLM(nn.Module):
             raise ValueError("generate currently supports batch size 1")
         if max_new_tokens < 0:
             raise ValueError("max_new_tokens must be non-negative")
+        if top_k is not None and top_k <= 0:
+            raise ValueError("top_k must be positive or None")
         if max_new_tokens == 0:
             return input_ids
         eos = self.config.eos_token_id if eos_token_id is None else eos_token_id
         result = input_ids
-        attention_mask = torch.ones_like(result, dtype=torch.long)
-        out = self(result, attention_mask=attention_mask, use_cache=True)
-        cache = out.past_key_values
-        logits = out.logits[:, -1, :]
+        backbone = self.model(result, use_cache=True)
+        cache = backbone.past_key_values
+        logits = self.lm_head(backbone.last_hidden_state[:, -1:, :]).float()[:, -1, :]
 
         for step in range(max_new_tokens):
             if temperature <= 0:
