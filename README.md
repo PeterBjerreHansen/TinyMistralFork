@@ -30,7 +30,7 @@ heads, 8 KV heads, head dimension 32, vocabulary size 32,005, a 32-position
 sliding window, and 248,024,064 parameters.
 
 The validated vanilla baseline is commit
-[`62d2a381`](https://github.com/PeterBjerreHansen/TinyMistralFork/commit/62d2a381b79d9982cc200dc6a01c3b64fea5437b).
+[`e44420d4`](https://github.com/PeterBjerreHansen/TinyMistralFork/commit/e44420d4190b6cfc1dc002c0ac67e364ef2f2de1).
 
 ## Install
 
